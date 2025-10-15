@@ -2,10 +2,26 @@ use anyhow::{Ok, Result, anyhow};
 use core::fmt;
 use std::ops::{Add, AddAssign, Mul};
 
+use crate::Vector;
+
 pub struct Matrix<T> {
     data: Vec<T>,
     row: usize,
     col: usize,
+}
+
+fn dot_product<T>(a: Vector<T>, b: Vector<T>) -> Result<T>
+where
+    T: Copy + Default + Add<Output = T> + AddAssign + Mul<Output = T>,
+{
+    if a.len() != b.len() {
+        return Err(anyhow!("dot product error: a.len() != b.len()"));
+    }
+    let mut sum = T::default();
+    for i in 0..a.len() {
+        sum += a[i] * b[i];
+    }
+    Ok(sum)
 }
 
 pub fn multiply<T>(a: &Matrix<T>, b: &Matrix<T>) -> Result<Matrix<T>>
@@ -18,9 +34,14 @@ where
     let mut data: Vec<T> = vec![T::default(); a.row * b.col];
     for i in 0..a.row {
         for j in 0..b.col {
-            for k in 0..a.col {
-                data[i * b.col + j] += a.data[i * a.col + k] * b.data[k * b.col + j];
-            }
+            let row = Vector::new(&a.data[i * a.col..(i + 1) * a.col]);
+            let col_data = b.data[j..]
+                .iter()
+                .step_by(b.col)
+                .copied()
+                .collect::<Vec<_>>();
+            let col = Vector::new(col_data);
+            data[i * b.col + j] = dot_product(row, col)?;
         }
     }
     Ok(Matrix::new(data, a.row, b.col))
